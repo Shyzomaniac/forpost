@@ -1,3 +1,3 @@
-target = 'my-forpost.ru'
+target = 'https://my-forpost.ru'
 login = 'login'
 password = 'password)'
