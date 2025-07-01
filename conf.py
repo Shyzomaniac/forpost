@@ -1,3 +1,3 @@
-target = 'https://my-forpost.ru'
-login = 'login'
-password = 'password)'
+target = 'https://cctv.bteleport.ru'
+login = 'vlasov'
+password = 'fpc40mko)'
