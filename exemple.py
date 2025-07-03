@@ -4,7 +4,9 @@ import json
 import account
 from conf import login, password, target
 
-
+from account import Account
+from camera import Camera
+from user import User
 
 
 
@@ -12,7 +14,7 @@ async def test_1():
     # Ищем аккаунт по номеру договора или названию
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    acc = await forpost.search_account('Сайт')
+    acc = await fpost.search_account('Дроботов')
     if isinstance(acc, account.Account):
         print(f"Аккаунт ID: {acc.id}\n" 
               f"Имя: {acc.name}\n" 
@@ -26,6 +28,7 @@ async def test_1():
         for user in acc.users:
             print(f"ID: {user.id}, Логин: {user.login}, Статус: {user.status}, Пароль: {user.password}")
         if acc.cameras:
+            print("Камеры:")
             for camera in acc.cameras:
                 print(f"ID: {camera.id}, Name: {camera.name}, Статус: {camera.status}\n"
                       f"Местонахождение: {camera.locations}, Запись: {camera.record}, Микрофон: {camera.mic}\n"
@@ -110,7 +113,7 @@ async  def test_5():
 
 async def main():
 
-    await test_4()
+    await test_1()
 
 
 

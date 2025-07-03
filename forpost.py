@@ -8,7 +8,7 @@ from auth import Auth
 from account import Account
 from camera import Camera
 from user import User
-from conf import login, password, target
+from conf import login, password, target #conf.py -> target = 'https://cctv.my-forpost.ru' login = 'login' password ='pass'
 
 
 
@@ -76,6 +76,7 @@ class Forpost:
                     empty_message = accounts_table.find('td', class_='empty')
                     if empty_message and "Нет результатов" in empty_message.text:
                         account = "Аккаунт не найден."
+                        print(f'{contract_number} - Аккаунт не найден.')
                         return account
                     else:
                         for row in accounts_table.find_all('tr'):
@@ -700,24 +701,32 @@ class Forpost:
 
 ############ Сектор отладки ####################
 async def main():
-
-    forpost = Forpost(target, login, password)
-    await forpost.initialize()
-
-    accounts = await forpost.get_all_accounts()
-    if accounts:
-        print(f'аккаунтов: {len(accounts)}')
-        with open("accounts.json", "w", encoding="utf-8") as f:
-            json.dump(accounts, f, ensure_ascii=False, indent=4)
-        print("Аккаунты успешно записаны в файл 'accounts.json'")
+    # Ищем аккаунт по номеру договора или названию
+    fpost = Forpost(target, login, password)
+    await fpost.initialize()
+    acc = await fpost.search_account('437314')
+    if isinstance(acc, Account):
+        print(f"Аккаунт ID: {acc.id}\n"
+              f"Имя: {acc.name}\n"
+              f"Договор: {acc.contract}\n"
+              f"Статус: {acc.status}\n"
+              f"Максимальное количество камер: {acc.max_cameras}\n"
+              f"Максимальное количество пользователей: {acc.max_users}\n"
+              f"Количество камер: {acc.num_cameras}\n"
+              f"Количество пользователей: {acc.num_users}"
+              )
+        for user in acc.users:
+            print(f"ID: {user.id}, Логин: {user.login}, Статус: {user.status}, Пароль: {user.password}")
+        if acc.cameras:
+            for camera in acc.cameras:
+                print(f"ID: {camera.id}, Name: {camera.name}, Статус: {camera.status}\n"
+                      f"Местонахождение: {camera.locations}, Запись: {camera.record}, Микрофон: {camera.mic}\n"
+                      f"IP: {camera.ipaddress}, http port: {camera.port_http}, onvif: {camera.port_onvif}\n"
+                      f"Битрейт: {camera.speed}, Логин: {camera.login}, пароль: {camera.password}\n"
+                      f"Модель: {camera.model}, адрес потока: {camera.stream}, кодек: {camera.videocodec}")
     else:
-        print("Аккаунтов нет.")
-
-
-
-
-
-    await forpost.close()
+        print(acc)
+    await fpost.close()
 
 
 
