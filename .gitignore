@@ -1,7 +1,9 @@
 venv/
+logs/
 conf.py
 .idea/
 __pycache__/
 accounts.json
 cameras.json
 big_bitrate.json
+write_log.py

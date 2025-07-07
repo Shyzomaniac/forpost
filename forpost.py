@@ -3,7 +3,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 from typing import Optional, Dict
 import re, json
-
+from write_log import write_log
 from auth import Auth
 from account import Account
 from camera import Camera
@@ -565,8 +565,8 @@ class Forpost:
 
 
 
-#------------- Блок функций записи -----------------------
-    async def create_account(self, name:str, contract:str, max_cameras, max_users="1", shortname=None):
+#------------- Блок функций записи и изменения информации -----------------------
+    async def create_account(self, name:str, contract:str, max_cameras, max_users="5", shortname=None):
         '''
         Функция создает на форпосте аккаунт. Для этого требуется минимальное количество данных:
         ФИО, номер договора, и количество камер. max_users - максимальное количество учеток выставляем автоматом 5шт.
@@ -574,7 +574,7 @@ class Forpost:
         :param name: Название (ФИО)
         :param contract: Договор
         :param max_cameras: Максимально разрешенное количество камер
-        :param max_users: Максимально разрешенное количество пользователей, необязательный параметр, по умолчанию 1
+        :param max_users: Максимально разрешенное количество пользователей, необязательный параметр, по умолчанию 5
         :param shortname: необязательный параметр, если его нет то ФИО укорачивается и складывается с договором.
         :return: возвращаем id_account
         '''
@@ -613,7 +613,7 @@ class Forpost:
                 if account_link:
                     href = account_link.get('href')
                     id_account = href.split('/admin/account/')[1].split('/')[0]
-                    print(f"✅ Аккаунт успешно создан. ID: {id_account}")
+                    print(f"✅ Аккаунт успешно создан. ID: {id_account}, договор: {contract}")
                     return id_account
                 else:
                     print("⚠️ Не удалось извлечь ID аккаунта из ответа.")
@@ -697,35 +697,114 @@ class Forpost:
             await self.session.close()
 
 
+    async def add_user(self, login, password, account_id):
+        """
+        Создает пользователя в аккаунте.
+        :param login: Логин
+        :param password: Пароль
+        :param account_id: ID аккаунта в котором создаем пользователя.
+        :return: при ошибках возращает None, если пользвателя удалось создать возвращает ID
+        """
+        url = f"{self.target}/admin/account/{account_id}/user/add.html"
+        payload = {
+            "yform_userForm": "1",  # Скрытый input
+            "User[Login]": login,
+            "User[Password]": password,
+            "User[PasswordRepeat]": password,
+            "User[Email]": "",
+            "User[Phone]": "",
+            "User[Postcode]": "",
+            "User[Region]": "",
+            "User[Locality]": "",
+            "User[Street]": "",
+            "User[Home]": "",
+            "User[TimeZone]": "",
+            "User[IsActive]": "1",
+            "User[CanChangeOwnInfo]": "0",
+            "User[ChangePasswordAtNextLogin]": "0",
+            "AccountUser[IsReadOnly]": "0",
+            "User[IsAccessibleNewCameraByDefault]": "0",
+            "submit": "Добавить"
+        }
+
+        async with self.session.post(url, data=payload) as response:
+            if response.status == 200:
+                text = await response.text()
+                soup = BeautifulSoup(text, 'html.parser')
+                error_message = soup.select_one("div.errorMessage")
+                if error_message and "уже занят" in error_message.get_text():
+                    print(f'❌ Логин "{login}" уже занят. аккаунт: {account_id}')
+                    return None
+                error_message = soup.select_one("div.alert.alert-error")
+                if error_message and "Достигнуто ограничение на количество пользователей." in error_message.get_text():
+                    print(f"Ошибка: достигнуто ограничение на количество пользователей. аккаунт: {account_id}")
+                    return None
+                user_link = soup.find('a', href=lambda href: href and f'/admin/account/{account_id}/user/' in href)
+                if user_link:
+                    href = user_link.get('href')
+                    user_id = href.split(f'/admin/account/{account_id}/user/')[1].split('/')[0]
+                    user_id = int(user_id)
+                    print(f"✅ Пользователь {login} создан. ID: {user_id}")
+                    return user_id
+                else:
+                    print("⚠️ Не удалось извлечь ID пользователя из ответа.")
+                    return None
+            elif response.status == 500:
+                text = await response.text()
+                print(f"Ошибка 500: {text}")
+                return None
+            else:
+                print(f"Ошибка запроса: {response.status} при создании user на аккаунте: {account_id}")
+                return None
+
+
+    async def change_user_password(self, account_id, user_id, password):
+        """
+        Меняет пароль на пользователе.
+        :param account_id: ID аккаунта
+        :param user_id: ID пользователя
+        :param password: новый пароль
+        :return: True\False
+        """
+        url = f"{self.target}/admin/account/{account_id}/user/{user_id}/password.html"
+        payload = {
+            "yform_userForm": "1",
+            "User[Password]": password,
+            "User[PasswordRepeat]": password,
+            "User[ChangePasswordAtNextLogin]": "0",
+            "User[EmailPassword]": "0",
+            "submit": "Изменить пароль"
+        }
+        async with self.session.post(url, data=payload) as response:
+            if response.status == 200:
+                text = await response.text()
+                soup = BeautifulSoup(text, 'html.parser')
+                breadcrumb = soup.select_one("ul.breadcrumb")
+                if breadcrumb and f"admin/account/{account_id}/view.html" in str(breadcrumb):
+                    print("✅ Пароль успешно изменён.")
+                    return True
+                print("⚠️ Не удалось определить результат изменения пароля.")
+                return False
+            elif response.status == 404:
+                print("❌ Пользователь или аккаунт не найден.")
+                return False
+            elif response.status == 500:
+                text = await response.text()
+                print(f"❌ Ошибка 500: {text[:200]}...")
+                return False
+            else:
+                print(f"❌ Ошибка запроса: {response.status}")
+                return False
+
+
 
 
 ############ Сектор отладки ####################
 async def main():
-    # Ищем аккаунт по номеру договора или названию
     fpost = Forpost(target, login, password)
     await fpost.initialize()
-    acc = await fpost.search_account('437314')
-    if isinstance(acc, Account):
-        print(f"Аккаунт ID: {acc.id}\n"
-              f"Имя: {acc.name}\n"
-              f"Договор: {acc.contract}\n"
-              f"Статус: {acc.status}\n"
-              f"Максимальное количество камер: {acc.max_cameras}\n"
-              f"Максимальное количество пользователей: {acc.max_users}\n"
-              f"Количество камер: {acc.num_cameras}\n"
-              f"Количество пользователей: {acc.num_users}"
-              )
-        for user in acc.users:
-            print(f"ID: {user.id}, Логин: {user.login}, Статус: {user.status}, Пароль: {user.password}")
-        if acc.cameras:
-            for camera in acc.cameras:
-                print(f"ID: {camera.id}, Name: {camera.name}, Статус: {camera.status}\n"
-                      f"Местонахождение: {camera.locations}, Запись: {camera.record}, Микрофон: {camera.mic}\n"
-                      f"IP: {camera.ipaddress}, http port: {camera.port_http}, onvif: {camera.port_onvif}\n"
-                      f"Битрейт: {camera.speed}, Логин: {camera.login}, пароль: {camera.password}\n"
-                      f"Модель: {camera.model}, адрес потока: {camera.stream}, кодек: {camera.videocodec}")
-    else:
-        print(acc)
+    await fpost.change_user_password(account_id=233, user_id=751, password="43214321")
+
     await fpost.close()
 
 
@@ -734,5 +813,5 @@ async def main():
 
 
 if __name__ == "__main__":
-# Запуск основного цикла
+
     asyncio.run(main())

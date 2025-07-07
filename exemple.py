@@ -45,7 +45,7 @@ async def test_2():
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
     id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="6")
-    #await forpost.edit_account(id_account="919", name="Vlasov Viktor Sergeevich", contract="889900", max_cameras="1", max_users="1")
+    #await forpost.edit_account(id_account=id_account, name="Vlasov Viktor Sergeevich", contract="889900", max_cameras="1", max_users="1")
     print(id_account)
     await fpost.close()
 
@@ -110,10 +110,20 @@ async  def test_5():
     await fpost.close()
 
 
+async def test_6():
+    # создаем аккаунт, создаем в нем пользователя
+    fpost = forpost.Forpost(target, login, password)
+    await fpost.initialize()
+    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="6")
+    print(f"account ID: {id_account}")
+    user_ui = await fpost.add_user(login="12341234", password="12341234", account_id=id_account)
+    print(f'user ID: {user_ui}')
+    await fpost.close()
+
 
 async def main():
 
-    await test_1()
+    await test_6()
 
 
 
