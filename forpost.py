@@ -797,6 +797,130 @@ class Forpost:
                 return False
 
 
+    async def add_camera(self, account_id, name, locations, ipaddress, port_onvif:int, port_http:int, login, password,
+                         stream, videocodec,
+                         record:int=0, mic:bool=False, speed:int=2048):
+        """
+        Функция создает камеру на форпосте под определенным аккаунтом. При успешном создании возвращается ID камеры.
+
+        :param account_id: ID аккаунта, проверяется чтоб это было число.
+        :param name: Имя камеры, отображается поверх изображения камеры.
+        :param locations: Адрес местонахождения, просто справочная строка.
+        :param ipaddress: IP камеры или доменное имя.
+        :param port_onvif: порт rstp, стандартный для этого протокола порт 554(настраивается в камере)
+        :param port_http: порт управления, обычно веб 80 или 8080(настраивается в камере)
+        :param login: Логин для доступа к камере
+        :param password: пароль для доступа к камере
+        :param stream: Адрес потока. (для st-181 он к примеру /media/video1)
+        :param videocodec: Кодек. Допустимые значения: H.264 или H.265
+        :param record: Запись архива. Допустимые значения: 0-30, 45, 60, 90 дней. 0 - без хранения.
+        :param mic: Используем микрофон - False или True
+        :param speed: Битрейт. допустимые значения:
+                       (128, 256, 512, 1024, 1536, 2048, 3072, 3584, 4096, 5120, 6144, 7168, 8192)
+        :return: ID камеры
+        """
+        try:
+            if not isinstance(account_id, int):
+                try:
+                    account_id = int(account_id)
+                except ValueError:
+                    print("Ошибка: account_id должен быть целым числом")
+                    return None
+
+            for port in [port_onvif, port_http]:
+                if not isinstance(port, int):
+                    try:
+                        port = int(port)
+                    except ValueError:
+                        print("Ошибка: порты должны быть целыми числами")
+                        return None
+
+            valid_speeds = [128, 256, 512, 1024, 1536, 2048, 3072, 3584, 4096, 5120, 6144, 7168, 8192]
+            if speed not in valid_speeds:
+                speed = min(valid_speeds, key=lambda x: abs(x - speed))
+                print(f"Предупреждение: скорость изменена на ближайшее допустимое значение: {speed}")
+
+            if videocodec.lower() not in ['h.264', 'h.265']:
+                print("Ошибка: недопустимый видеокодек. Допустимые значения: H.264 или H.265")
+                return None
+            videocodec = videocodec.upper()
+
+            valid_record_days = list(range(0, 31)) + [45, 60, 90]
+            if record not in valid_record_days:
+                print("Ошибка: недопустимое значение записи. Допустимые значения: 0-30, 45, 60, 90 дней")
+                return None
+
+        except Exception as e:
+            print(f"Ошибка валидации параметров: {str(e)}")
+            return None
+
+        url = f"{self.target}/admin/account/{account_id}/camera/wizard.html"
+
+        payload = {
+            "Camera[MACSettings]": "",
+            "Camera[MasterID]": "1",
+            "Camera[IP]": ipaddress,
+            "Camera[Port]": str(port_onvif),
+            "Camera[HTTPPort]": str(port_http),
+            "Camera[Login]": login,
+            "Camera[Password]": password,
+            "Camera[CameraBrand]": "",
+            "Camera[CameraModelID]": "",
+            "Camera[Channel]": "",
+            "Camera[Protocol]": "rtsp",
+            "Camera[RtspTransport]": "",
+            "Camera[MJPEG]": stream,
+            "Camera[LightPath]": "",
+            "Camera[Name]": name,
+            "Camera[Address]": locations,
+            "Camera[Coordinates][Lat]": "",
+            "Camera[Coordinates][Lon]": "",
+            "Camera[IsRecord]": "1",
+            "Camera[MaxBandwidth]": str(speed),
+            "Camera[RecordType]": "0" if record == 0 else "1",
+            "Camera[SecretKey]": "0",
+            "Camera[Quota]": str(record * 86400) if record > 0 else "",
+            "Camera[IsSound]": "1" if mic else "0",
+            "Camera[IsPTZEnabled]": "0",
+            "Camera[PanOffset]": "",
+            "Camera[VideoCodec]": videocodec
+        }
+
+        try:
+            async with self.session.post(url, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}) as response:
+                print(f"Статус ответа: {response.status}")
+                print(f"Заголовки ответа: {response.headers}")
+                response_text = await response.text()
+                print(f"Полный ответ сервера:\n{response_text}")
+                try:
+                    response_data = json.loads(response_text)
+                    if 'id' in response_data:
+                        print(f"Успешно получен ID камеры: {response_data['id']}")
+                        return int(response_data['id'])
+                    elif 'Camera_MJPEG' in response_data:
+                        print(f"Ошибка валидации: {response_data['Camera_MJPEG']}")
+                        raise Exception("ID камеры не найден в JSON-ответе")
+                    else:
+                        raise Exception("ID камеры не найден в JSON-ответе")
+                except json.JSONDecodeError:
+                    soup = BeautifulSoup(response_text, 'html.parser')
+                    print("Ответ не в формате JSON, пытаемся парсить HTML")
+                    camera_id = None
+                    for input_tag in soup.find_all('input', type='hidden'):
+                        if 'name' in input_tag.attrs and 'id' in input_tag.attrs['name']:
+                            camera_id = input_tag['value']
+                            break
+
+                    if camera_id:
+                        return int(camera_id)
+                    else:
+                        raise Exception("Не удалось найти ID камеры в HTML-ответе")
+
+        except Exception as e:
+            print(f"Произошла ошибка: {str(e)}")
+            return None
+
+
 
 
 ############ Сектор отладки ####################

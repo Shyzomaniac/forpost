@@ -1,8 +1,11 @@
 import forpost
 import asyncio
+import datetime
+import os
 import json
 import account
 from conf import login, password, target
+from write_log import write_log
 
 from account import Account
 from camera import Camera
@@ -14,7 +17,7 @@ async def test_1():
     # Ищем аккаунт по номеру договора или названию
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    acc = await fpost.search_account('Дроботов')
+    acc = await fpost.search_account('430984')
     if isinstance(acc, account.Account):
         print(f"Аккаунт ID: {acc.id}\n" 
               f"Имя: {acc.name}\n" 
@@ -44,7 +47,7 @@ async def test_2():
     # создаем аккаунт, меняем аккаунт
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="6")
+    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
     #await forpost.edit_account(id_account=id_account, name="Vlasov Viktor Sergeevich", contract="889900", max_cameras="1", max_users="1")
     print(id_account)
     await fpost.close()
@@ -114,16 +117,83 @@ async def test_6():
     # создаем аккаунт, создаем в нем пользователя
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="6")
+    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
     print(f"account ID: {id_account}")
-    user_ui = await fpost.add_user(login="12341234", password="12341234", account_id=id_account)
+    user_ui = await fpost.add_user(login="1234512345", password="1234512345", account_id=id_account)
     print(f'user ID: {user_ui}')
     await fpost.close()
 
 
+async def test_7():
+    #Создаем камеру в существующем аккаунте с ID 969
+    fpost = forpost.Forpost(target, login, password)
+    await fpost.initialize()
+    camera_id = await fpost.add_camera(
+             account_id=969,
+             name="camera1",
+             locations="moscow",
+             ipaddress="192.168.12.12",
+             port_onvif=5541,
+             port_http=8081,
+             login="admin",
+             password="admin",
+             stream="/0",
+             videocodec="H.264",
+             speed=1819
+         )
+    print(f"ID добавленной камеры: {camera_id}")
+
+    await fpost.close()
+
+
+async def backup_all_forpost():
+    #выгребаем аккаунты, по аккаунтам выгребаем все что в них есть и пишем все это в файл
+    await write_log(f'backup_all_forpost: начинаем бекапить форпост полностью')
+    now = datetime.datetime.now()
+    date = now.strftime('%Y_%m_%d')
+    big_backup:str = f"Бекап с форпоста за {now}\n"
+    fpost = forpost.Forpost(target, login, password)
+    await fpost.initialize()
+    accounts = await fpost.get_all_accounts()
+    print(f'Аккаунтов извлечено: {len(accounts)}')
+    big_backup += f'{date}. Аккаунтов извлечено: {len(accounts)}\n\n'
+    for account_id, data in accounts.items():
+        account: Account = await fpost.search_account(data.get("contract"))
+        big_backup += f"Аккаунт ID: {account.id}\n" \
+                      f"Имя: {account.name}\n" \
+                      f"Договор: {account.contract}\n" \
+                      f"Статус: {account.status}\n" \
+                      f"Максимальное количество камер: {account.max_cameras}\n" \
+                      f"Максимальное количество пользователей: {account.max_users}\n" \
+                      f"Количество камер: {account.num_cameras}\n" \
+                      f"Количество пользователей: {account.num_users}\n"
+        if account.users:
+            big_backup += f"Пользователи:\n"
+            for user in account.users:
+                big_backup += f"ID: {user.id}, Логин: {user.login}, Статус: {user.status}, Пароль: {user.password}\n"
+        if account.cameras:
+            big_backup += f"Камеры:\n"
+            for camera in account.cameras:
+                big_backup += f"ID: {camera.id}, Name: {camera.name}, Статус: {camera.status}\n" \
+                              f"Местонахождение: {camera.locations}, Запись: {camera.record}, Микрофон: {camera.mic}\n"\
+                              f"IP: {camera.ipaddress}, http port: {camera.port_http}, onvif: {camera.port_onvif}\n"\
+                              f"Битрейт: {camera.speed}, Логин: {camera.login}, пароль: {camera.password}\n"\
+                              f"Модель: {camera.model}, адрес потока: {camera.stream}, кодек: {camera.videocodec}\n\n"
+        big_backup += f"===========================================================================\n\n"
+
+    os.makedirs('backup', exist_ok=True)
+    log_filename = f'backup_{date}.txt'
+    file_path = os.path.join('backup', log_filename)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(big_backup)
+
+    await fpost.close()
+    await write_log(f'backup_all_forpost: закончили бекапить. записано {len(accounts)} аккаунтов')
+
+
 async def main():
 
-    await test_6()
+    await test_7()
 
 
 
