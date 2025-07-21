@@ -55,6 +55,7 @@ class Forpost:
         :return: обьект Account с неполными данными(пока).
         в Account данные о id, Название, Номер счета и состояние (вкл\выкл), users = []
         '''
+        await write_log(f"Поиск по договору {contract_number}")
         accounts_url = f"{target}/admin/accounts.html"
         params = {
             'Account[ID]': '',
@@ -75,9 +76,8 @@ class Forpost:
                 if accounts_table:
                     empty_message = accounts_table.find('td', class_='empty')
                     if empty_message and "Нет результатов" in empty_message.text:
-                        account = "Аккаунт не найден."
-                        print(f'{contract_number} - Аккаунт не найден.')
-                        return account
+                        await  write_log(f'{contract_number} - Аккаунт не найден.')
+                        return False
                     else:
                         for row in accounts_table.find_all('tr'):
                             if 'filters' in row.get('class', []):
@@ -90,10 +90,10 @@ class Forpost:
                                 account.contract = columns[3].text.strip()
                                 account.status = columns[4].text.strip()
                                 acc_info = await self.get_account(account.id)
-                                account.max_cameras = acc_info.get('max_cameras')
-                                account.max_users = acc_info.get('max_users')
-                                account.num_users = acc_info.get('num_users')
-                                account.num_cameras = acc_info.get('num_cameras')
+                                account.max_cameras = acc_info.get('max_cameras', None)
+                                account.max_users = acc_info.get('max_users', None)
+                                account.num_users = acc_info.get('num_users', None)
+                                account.num_cameras = acc_info.get('num_cameras', None)
                                 users_table = await self.get_users(account.id)
                                 if users_table:
                                     for user in users_table:
@@ -102,28 +102,30 @@ class Forpost:
                                 if cameras_table:
                                     for camera in cameras_table:
                                         account.add_camera(camera)
+                                await write_log(f"{contract_number} найден, возвращаем обьект account")
                                 return account
                 else:
-                    account = "Не удалось найти таблицу аккаунтов."
-                    return account
+                    await write_log("Не удалось найти таблицу аккаунтов.")
+                    return False
             else:
-                account = "Не удалось получить страницу аккаунтов."
-                return account
+                await write_log("Не удалось получить страницу аккаунтов.")
+                return False
 
 
-    async def get_account(self, id_account):
+    async def get_account(self, account_id):
         '''
         Функция по ID аккаунту извлекает из форпоста информацию о количестве камер, учеток,
         максимальных лимитах камер и учеток.
 
-        :param id_account: ID аккаунта
+        :param account_id: ID аккаунта
         :return: словарь
                         'max_cameras': max_cameras,
                         'max_users': max_users,
                         'num_users': num_users,
                         'num_cameras': num_cameras
         '''
-        url = f"{target}/admin/account/{id_account}/view.html"
+        await write_log(f"get_account: запрос подробностей о ID {account_id}")
+        url = f"{target}/admin/account/{account_id}/view.html"
         async with self.session.get(url) as response:
             if response.status == 200:
                 text = await response.text()
@@ -151,18 +153,23 @@ class Forpost:
                     }
                 else:
                     print("Не удалось найти таблицу аккаунта.")
+                    await write_log(f"Не удалось найти таблицу аккаунта.")
+                    return False
             else:
                 print("Не удалось получить страницу аккаунта.")
+                await write_log(f"Не удалось получить страницу аккаунта.")
+                return False
 
 
-    async def get_users(self, id_account) -> dict[User]:
+    async def get_users(self, account_id) -> dict[User]:
         """
         Функция по ID аккаунту извлекает из форпоста информацию о пользователях этого аккаунта,
         и возвращает словарь с обьектами User. пользователей может быть один, а может быть несколько.
-        :param id_account:
+        :param account_id:
         :return: пустой список если нет, или список с обьектами пользователями для данного аккаунта
         """
-        url = f"{target}/admin/account/{id_account}/users.html"
+        await write_log(f"get_users: извлекаем таблицу пользователей у ID аккаунта {account_id}")
+        url = f"{target}/admin/account/{account_id}/users.html"
         async with self.session.get(url) as response:
             if response.status == 200:
                 text = await response.text()
@@ -181,26 +188,30 @@ class Forpost:
                             login = columns[3].text.strip()
                             user = User(id=user_id, login=login, status=status, password="Hide")
                             users.append(user)
+                    await write_log(f"возвращаем пользователей {len(users)} шт")
                     return users
                 else:
                     print("Не удалось найти таблицу пользователей.")
+                    await write_log("Не удалось найти таблицу пользователей.")
                     return []
             else:
                 print("Не удалось получить страницу пользователей.")
+                await write_log("Не удалось получить страницу пользователей.")
                 return []
 
 
-    async def get_cameras(self, id_account) -> dict[Camera]:
+    async def get_cameras(self, account_id) -> dict[Camera]:
         """
         Функция по ID аккаунту извлекает из форпоста информацию о камерах для заданого аккаунта.
         Камер может быть ноль, одна или несколько. Попутно вызывается еще одна функция которая по каждой камере
         извлекает дополнительные поля.
         Возвращает словарь с обьектами типа Camera
 
-        :param id_account:
+        :param account_id:
         :return: dict[Camera] словарь с камерами, или пустой словарь если на аккаунте нет камер.
         """
-        url = f"{self.target}/admin/account/{id_account}/cameras.html"
+        await write_log(f"get_cameras: извлекаем все камеры с аккаунта ID: {account_id}")
+        url = f"{self.target}/admin/account/{account_id}/cameras.html"
         async with self.session.get(url) as response:
             if response.status == 200:
                 text = await response.text()
@@ -217,7 +228,7 @@ class Forpost:
                         camera_id = columns[0].text.strip()
                         name_tag = columns[1].find('a')
                         name = name_tag.text.strip() if name_tag else "Без названия"
-                        camera_detail = await self.get_camera(id_account, camera_id)
+                        camera_detail = await self.get_camera(account_id, camera_id)
                         camera = Camera(
                             id=camera_id,
                             name=name,
@@ -236,18 +247,20 @@ class Forpost:
                             videocodec= camera_detail.get('videocodec')
                         )
                         cameras.append(camera)
+                await write_log(f"Возвращаем {len(cameras)} шт камер")
                 return cameras
             else:
                 print("Не удалось получить страницу камер.")
+                await write_log("Не удалось получить страницу камер.")
                 return []
 
 
-    async def get_camera(self, id_account, id_camera) -> dict:
+    async def get_camera(self, account_id, id_camera) -> dict:
         """
     Функция извлекает из форпоста все настройки камеры.
 
     Args:
-        id_account (str): ID аккаунта
+        account_id (str): ID аккаунта
         id_camera (str): ID камеры
 
     Returns:
@@ -267,7 +280,8 @@ class Forpost:
             - stream (str)
             - videocodec (str)
     """
-        url = f"{target}/admin/account/{id_account}/camera/{id_camera}/view.html"
+        await write_log(f"get_camera: Извлекаем подробности камеры ID: {id_camera}, аккаунт ID: {account_id}")
+        url = f"{target}/admin/account/{account_id}/camera/{id_camera}/view.html"
         name = "ХЗ"
         status = "ХЗ"
         locations = "ХЗ"
@@ -315,8 +329,9 @@ class Forpost:
                         model = td_text
             else:
                 print(f"Не удалось получить страницу камеры {id_camera}. Статус: {response.status}")
+                await write_log(f"Не удалось получить страницу камеры {id_camera}. Статус: {response.status}")
                 return None
-        url_edit = f"{target}/admin/account/{id_account}/camera/{id_camera}/edit.html"
+        url_edit = f"{target}/admin/account/{account_id}/camera/{id_camera}/edit.html"
         async with self.session.get(url_edit) as response:
             if response.status == 200:
                 text = await response.text()
@@ -369,7 +384,7 @@ class Forpost:
                         videocodec  = 'h.264'
                 else:
                     videocodec = 'h.264'
-
+        await write_log("Возвращаем словарь с камерой")
         return {
                 'name': name,
                 'status': status,
@@ -392,8 +407,9 @@ class Forpost:
     async def get_all_accounts(self) -> dict:
         '''
         отдает все аккаунты из форпоста
-        :return: словарь
+        :return: словарь. что именно в словаре смотри в _parse_account_page
         '''
+        await write_log(f"get_all_accounts: извлекаем все аккаунты с форпоста")
         first_page_url = f"{target}/admin/accounts.html"
         all_accounts = {}
         first_page_data = await self._get_page(first_page_url)
@@ -420,7 +436,7 @@ class Forpost:
                     page_accounts = self._parse_account_page(page_data)
                     if page_accounts:
                         all_accounts.update(page_accounts)
-
+        await write_log(f"Извлечено: {len(all_accounts)} аккаунтов")
         return all_accounts
 
 
@@ -437,6 +453,12 @@ class Forpost:
         Парсинг таблицы аккаунтов на элементы.
         :param soup:
         :return:
+                {
+                'name': name,
+                'created': created,
+                'contract': contract,
+                'status': status
+            }
         '''
         table = soup.select_one("table.table")
         if not table:
@@ -475,6 +497,11 @@ class Forpost:
 
 #------------- Парсим все камеры ---------------------------
     async def get_all_cameras(self) -> Optional[Dict[int, dict]]:
+        """
+        Функция извлекает все камеры с форпоста
+        :return: словарь с камерами. что именно в словаре смотри в _parse_cameras_page
+        """
+        await write_log(f"get_all_cameras: извлекаем все камеры с форпоста")
         first_page_url = f"{target}/admin/cameras.html"
         all_cameras = {}
 
@@ -502,7 +529,7 @@ class Forpost:
                     page_cameras = self._parse_cameras_page(page_data)
                     if page_cameras:
                         all_cameras.update(page_cameras)
-
+        await write_log(f"Возвращаем {len(all_cameras)} камер")
         return all_cameras
 
 
@@ -547,15 +574,15 @@ class Forpost:
 
             match = re.search(r"/admin/account/(\d+)/camera/\d+/view\.html", href)
             if not match:
-                print(f"Не удалось извлечь id_account из ссылки: {href}")
+                print(f"Не удалось извлечь account_id из ссылки: {href}")
                 continue
-            id_account = int(match.group(1))
+            account_id = int(match.group(1))
             is_on = cells[2].get_text(strip=True)
             is_record = cells[4].get_text(strip=True)
             created = cells[5].get_text(strip=True)
             cameras[camera_id] = {
                 "name": name,
-                "id_account": id_account,
+                "account_id": account_id,
                 "is_on": is_on,
                 "is_record": is_record,
                 "created": created
@@ -576,8 +603,9 @@ class Forpost:
         :param max_cameras: Максимально разрешенное количество камер
         :param max_users: Максимально разрешенное количество пользователей, необязательный параметр, по умолчанию 5
         :param shortname: необязательный параметр, если его нет то ФИО укорачивается и складывается с договором.
-        :return: возвращаем id_account
+        :return: возвращаем account_id
         '''
+        await write_log(f"create_account: Создаем аккаунт на форпосте contract: {contract}, name: {name}, max cam: {max_cameras}, max users: {max_users}")
         if shortname == None:
             surname = name.split()[0]
             shortname = f"{surname} {contract}"
@@ -612,31 +640,34 @@ class Forpost:
                 account_link = soup.find('a', href=lambda href: href and '/admin/account/' in href)
                 if account_link:
                     href = account_link.get('href')
-                    id_account = href.split('/admin/account/')[1].split('/')[0]
-                    print(f"✅ Аккаунт успешно создан. ID: {id_account}, договор: {contract}")
-                    return id_account
+                    account_id = href.split('/admin/account/')[1].split('/')[0]
+                    await  write_log(f"✅ Аккаунт успешно создан. ID: {account_id}, договор: {contract}")
+                    return account_id
                 else:
                     print("⚠️ Не удалось извлечь ID аккаунта из ответа.")
+                    await write_log("Не удалось извлечь ID аккаунта из ответа.")
                     return None
             else:
                 print(f"❌ Ошибка при создании аккаунта. Статус: {response.status}")
+                await write_log(f"Ошибка при создании аккаунта. Статус: {response.status}")
                 return None
 
 
-    async def edit_account(self, id_account, name:str, contract:str, max_cameras, max_users, shortname=None):
+    async def edit_account(self, account_id, name:str, contract:str, max_cameras, max_users, shortname=None):
         """
         Функция редактирует уже существующий аккаунт, для этого нам нужен ID аккаунта, плюс интересующие нас поля
 
 
-        :param id_account: ID существующего аккаунта
+        :param account_id: ID существующего аккаунта
         :param name: Название
         :param contract: Договор
         :param max_cameras: Максимально разрешенное количество камер
         :param max_users: Максимально разрешенное количество пользователей
         :param shortname: необязательный параметр, если его нет то ФИО укорачивается и складывается с договором.
-        :return: True если аккаунт удалось изменить, или различные ошибки строкой.
+        :return: True если аккаунт удалось изменить, или False.
         """
-        url = f"{target}/admin/account/{id_account}/edit.html"
+        await write_log(f"edit_account: редактируем аккаунт ID: {account_id}, name: {name}, contract: {contract}")
+        url = f"{target}/admin/account/{account_id}/edit.html"
         if shortname == None:
             surname = name.split()[0]
             shortname = f"{surname} {contract}"
@@ -666,30 +697,34 @@ class Forpost:
                 text = await response.text()
                 soup = BeautifulSoup(text, 'html.parser')
 
-                # Проверяем, что данные обновились
                 account_name = soup.find('td', text=name)
                 contract_number = soup.find('td', text=contract)
                 max_camera_count = soup.find('td', text=str(max_cameras))
                 max_login_count = soup.find('td', text=str(max_users))
 
                 if all([account_name, contract_number, max_camera_count, max_login_count]):
-                    print("✅ Аккаунт успешно отредактирован.")
+                    await write_log("✅ Аккаунт успешно отредактирован.")
                     return True
                 else:
                     print("⚠️ Данные аккаунта не обновились. Проверьте вручную.")
-                    return "⚠️ Данные аккаунта не обновились. Проверьте вручную."
+                    await write_log("Данные аккаунта не обновились. Проверьте вручную.")
+                    return False
 
             else:
                 print(f"❌ Ошибка при редактировании аккаунта. Статус: {response.status}")
+                await write_log(f"Ошибка при редактировании аккаунта. Статус: {response.status}")
                 if response.status == 404:
                     print("⚠️ Аккаунт с таким ID не существует.")
-                    return "⚠️ Аккаунт с таким ID не существует."
+                    await write_log("Аккаунт с таким ID не существует.")
+                    return False
                 elif response.status == 403:
                     print("⚠️ Нет прав на редактирование аккаунта.")
-                    return "⚠️ Нет прав на редактирование аккаунта."
+                    await write_log("Нет прав на редактирование аккаунта.")
+                    return False
                 else:
                     print("⚠️ Неизвестная ошибка.")
-                    return "⚠️ Неизвестная ошибка."
+                    await write_log("Неизвестная ошибка.")
+                    return False
 
 
     async def close(self):
@@ -705,6 +740,7 @@ class Forpost:
         :param account_id: ID аккаунта в котором создаем пользователя.
         :return: при ошибках возращает None, если пользвателя удалось создать возвращает ID
         """
+        await write_log(f"add_user: создаем учетку пользователя {login} на аккаунте ID: {account_id}")
         url = f"{self.target}/admin/account/{account_id}/user/add.html"
         payload = {
             "yform_userForm": "1",  # Скрытый input
@@ -738,6 +774,7 @@ class Forpost:
                 error_message = soup.select_one("div.alert.alert-error")
                 if error_message and "Достигнуто ограничение на количество пользователей." in error_message.get_text():
                     print(f"Ошибка: достигнуто ограничение на количество пользователей. аккаунт: {account_id}")
+                    await write_log(f"Ошибка: достигнуто ограничение на количество пользователей. аккаунт: {account_id}")
                     return None
                 user_link = soup.find('a', href=lambda href: href and f'/admin/account/{account_id}/user/' in href)
                 if user_link:
@@ -745,6 +782,7 @@ class Forpost:
                     user_id = href.split(f'/admin/account/{account_id}/user/')[1].split('/')[0]
                     user_id = int(user_id)
                     print(f"✅ Пользователь {login} создан. ID: {user_id}")
+                    await write_log(f"✅ Пользователь {login} создан. ID: {user_id}")
                     return user_id
                 else:
                     print("⚠️ Не удалось извлечь ID пользователя из ответа.")
@@ -766,6 +804,7 @@ class Forpost:
         :param password: новый пароль
         :return: True\False
         """
+        await write_log(f"change_user_password: меняем пароль на пользователе: {user_id} в аккаунте ID: {account_id}")
         url = f"{self.target}/admin/account/{account_id}/user/{user_id}/password.html"
         payload = {
             "yform_userForm": "1",
@@ -782,18 +821,22 @@ class Forpost:
                 breadcrumb = soup.select_one("ul.breadcrumb")
                 if breadcrumb and f"admin/account/{account_id}/view.html" in str(breadcrumb):
                     print("✅ Пароль успешно изменён.")
+                    await write_log("Пароль успешно изменён.")
                     return True
                 print("⚠️ Не удалось определить результат изменения пароля.")
                 return False
             elif response.status == 404:
                 print("❌ Пользователь или аккаунт не найден.")
+                await write_log("Пользователь или аккаунт не найден.")
                 return False
             elif response.status == 500:
                 text = await response.text()
                 print(f"❌ Ошибка 500: {text[:200]}...")
+                await write_log(f"Ошибка 500: {text[:200]}...")
                 return False
             else:
                 print(f"❌ Ошибка запроса: {response.status}")
+                await write_log(f"Ошибка запроса: {response.status}")
                 return False
 
 
@@ -819,6 +862,9 @@ class Forpost:
                        (128, 256, 512, 1024, 1536, 2048, 3072, 3584, 4096, 5120, 6144, 7168, 8192)
         :return: ID камеры
         """
+        await write_log(f"add_camera: account ID: {account_id}, name: {name,}, IP: {ipaddress}, onvif: {port_onvif}\n"
+                        f"http: {port_http}, stream: {stream}, videocodec: {videocodec}, mic: {mic}\n"
+                        f"архив: {record}, speed: {speed}")
         try:
             if not isinstance(account_id, int):
                 try:
@@ -888,14 +934,12 @@ class Forpost:
 
         try:
             async with self.session.post(url, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}) as response:
-                print(f"Статус ответа: {response.status}")
-                print(f"Заголовки ответа: {response.headers}")
                 response_text = await response.text()
-                print(f"Полный ответ сервера:\n{response_text}")
                 try:
                     response_data = json.loads(response_text)
                     if 'id' in response_data:
                         print(f"Успешно получен ID камеры: {response_data['id']}")
+                        await write_log(f"add_camera: Успешно получен ID камеры: {response_data['id']}")
                         return int(response_data['id'])
                     elif 'Camera_MJPEG' in response_data:
                         print(f"Ошибка валидации: {response_data['Camera_MJPEG']}")
@@ -920,6 +964,129 @@ class Forpost:
             print(f"Произошла ошибка: {str(e)}")
             return None
 
+
+    async def edit_camera(self, account_id, id_camera, name, locations, ipaddress, port_onvif:int, port_http:int, login, password,
+                         stream, videocodec, OnvifMotionPort:bool=False, resolution="1920x1080", motion:bool=False,
+                         record:int=0, mic:bool=False, speed:int=2048, isactive:bool=True):
+        """
+        Редактируем параметры камеры.
+
+        :param account_id: ID аккаунта
+        :param id_camera: ID камеры
+        :param name: Имя камеры
+        :param locations: Адрес местонахождения
+        :param ipaddress: Сетевой адрес камеры
+        :param port_onvif: Порт видео/аудио
+        :param port_http: Управляющий порт (HTTP/ONVIF)
+        :param login: Логин
+        :param password: Пароль
+        :param stream: Адрес потока. (для st-181 он к примеру /media/video1)
+        :param videocodec: Кодек. Допустимые значения: H.264 или H.265
+        :param OnvifMotionPort: Использовать ONVIF для получения от камеры уведомлений о движении
+        :param resolution: Разрешение, по умолчанию "1920x1080" доступные значения:
+            "320x240", "640x480", "704x576", "720x576", "800x600",
+                "1024x768", "1280x720", "1280x1024", "1600x1200",
+                "1920x1080", "2048x1536", "2304x1296", "2560x1440",
+                "2592x1520", "2688x1520"
+        :param motion: Получать уведомления о движении от камеры True\False
+        :param record: Запись архива. Допустимые значения: 0-30, 45, 60, 90 дней. 0 - без хранения.
+        :param mic: Используем микрофон - False или True
+        :param speed: Битрейт. допустимые значения:
+                       (128, 256, 512, 1024, 1536, 2048, 3072, 3584, 4096, 5120, 6144, 7168, 8192)
+        :param isactive: Камера включена True\False
+        :return:
+        """
+        try:
+            if not isinstance(account_id, int):
+                try:
+                    account_id = int(account_id)
+                except ValueError:
+                    print("Ошибка: account_id должен быть целым числом")
+                    return None
+
+            for port in [port_onvif, port_http]:
+                if not isinstance(port, int):
+                    try:
+                        port = int(port)
+                    except ValueError:
+                        print("Ошибка: порты должны быть целыми числами")
+                        return None
+
+            valid_speeds = [128, 256, 512, 1024, 1536, 2048, 3072, 3584, 4096, 5120, 6144, 7168, 8192]
+            if speed not in valid_speeds:
+                speed = min(valid_speeds, key=lambda x: abs(x - speed))
+                print(f"Предупреждение: скорость изменена на ближайшее допустимое значение: {speed}")
+
+            if videocodec.lower() not in ['h.264', 'h.265']:
+                print("Ошибка: недопустимый видеокодек. Допустимые значения: H.264 или H.265")
+                return None
+            videocodec = videocodec.upper()
+
+            valid_record_days = list(range(0, 31)) + [45, 60, 90]
+            if record not in valid_record_days:
+                print("Ошибка: недопустимое значение записи. Допустимые значения: 0-30, 45, 60, 90 дней")
+                return None
+
+        except Exception as e:
+            print(f"Ошибка валидации параметров: {str(e)}")
+            return None
+
+        valid_resolutions = {
+            "320x240", "640x480", "704x576", "720x576", "800x600",
+            "1024x768", "1280x720", "1280x1024", "1600x1200",
+            "1920x1080", "2048x1536", "2304x1296", "2560x1440",
+            "2592x1520", "2688x1520"
+        }
+        if resolution not in valid_resolutions:
+            print(f"Неверное разрешение {resolution}. Используется значение по умолчанию 1920x1080")
+            resolution = "1920x1080"
+
+        url_edit = f"{target}/admin/account/{account_id}/camera/{id_camera}/edit.html"
+        await write_log(f'edit_camera: account_id: {account_id}, id_camera{id_camera}')
+        payload = {
+            "Camera[Name]": name,
+            "Camera[AccountID]": str(account_id),
+            "Camera[Address]": locations,
+            "Camera[AccountObjectID]": "", #Объект
+            "Camera[Coordinates][Lat]": "",
+            "Camera[Coordinates][Lon]": "",
+            "Camera[MaxBandwidth]": str(speed),
+            "Camera[Resolution]": resolution,
+            "Camera[IsSound]": "1" if mic else "0",
+            "Camera[RecordType]": "0" if record == 0 else "1",
+            "Camera[Quota]": str(record * 86400) if record > 0 else "",
+            "Camera[SecretKey]": "1" if motion else "0", #Получать уведомления о движении от камеры
+            "Camera[LightCameraMDEnabled]": "0", #Анализировать дополнительный поток
+            "Camera[IsActive]": "1" if isactive else "0", #Камера включена
+            "Camera[MasterID]": "1", #Кластер *
+            "Camera[IP]": ipaddress,
+            "Camera[Port]": str(port_onvif),
+            "Camera[HTTPPort]": str(port_http),
+            "Camera[OnvifMotionPort]": "1" if OnvifMotionPort else "0", #Использовать ONVIF для получения от камеры уведомлений о движении
+            "Camera[CameraBrand]": "",
+            "Camera[CameraModelID]": "",
+            "Camera[Channel]": "",
+            "Camera[Login]": login,
+            "Camera[Password]": password,
+            "Camera[Protocol]": "rtsp",
+            "Camera[VideoCodec]": videocodec,
+            "Camera[RtspTransport]": "tcp",
+            "Camera[MJPEG]": stream,
+            "Camera[LightPath]": "", #Адрес дополнительного потока
+            "Camera[LightCameraBufferEnabled]": "0", #Буферизировать дополнительный поток
+            "Camera[AudioPath]": "", #Адрес аудио-потока
+            "Camera[PTZTypeID]": "", #Управление поворотом (PTZ)
+            "Camera[PanOffset]": "", #Отклонение от сервера (в градусах)
+            "Camera[RebootPeriod]": "0", #Автоматическая перезагрузка камеры
+            "submit": "Сохранить"
+        }
+        try:
+            async with self.session.post(url_edit, data=payload, headers={'Content-Type': 'application/x-www-form-urlencoded'}) as response:
+                if response.status == 200:
+                    return True
+        except Exception as e:
+            print(f"Произошла ошибка: {str(e)}")
+            return None
 
 
 

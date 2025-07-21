@@ -47,9 +47,9 @@ async def test_2():
     # создаем аккаунт, меняем аккаунт
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
-    #await forpost.edit_account(id_account=id_account, name="Vlasov Viktor Sergeevich", contract="889900", max_cameras="1", max_users="1")
-    print(id_account)
+    account_id = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
+    #await forpost.edit_account(account_id=account_id, name="Vlasov Viktor Sergeevich", contract="889900", max_cameras="1", max_users="1")
+    print(account_id)
     await fpost.close()
 
 
@@ -100,11 +100,11 @@ async  def test_5():
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
     for camera_id, camera_data in cameras.items():
-        cam = await fpost.get_camera(camera_data.get("id_account"), camera_id)
+        cam = await fpost.get_camera(camera_data.get("account_id"), camera_id)
         speed = int(cam.get("speed"))
         if speed > 2048:
-            print(f'ID камеры: {camera_id}, ID аккаунта: {camera_data.get("id_account")}\n{cam.get("speed")}')
-            cam_big_bitrate[camera_id] = {"id_account": camera_data.get("id_account"), "speed":cam.get("speed")}
+            print(f'ID камеры: {camera_id}, ID аккаунта: {camera_data.get("account_id")}\n{cam.get("speed")}')
+            cam_big_bitrate[camera_id] = {"account_id": camera_data.get("account_id"), "speed":cam.get("speed")}
     if cam_big_bitrate:
         print(f"Количество камер с битрейтом более 2048: {len(cam_big_bitrate)}")
         with open("big_bitrate.json", "w", encoding="utf-8") as f:
@@ -117,9 +117,9 @@ async def test_6():
     # создаем аккаунт, создаем в нем пользователя
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    id_account = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
-    print(f"account ID: {id_account}")
-    user_ui = await fpost.add_user(login="1234512345", password="1234512345", account_id=id_account)
+    account_id = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
+    print(f"account ID: {account_id}")
+    user_ui = await fpost.add_user(login="1234512345", password="1234512345", account_id=account_id)
     print(f'user ID: {user_ui}')
     await fpost.close()
 
@@ -143,6 +143,31 @@ async def test_7():
          )
     print(f"ID добавленной камеры: {camera_id}")
 
+    await fpost.close()
+
+async def test_8():
+    fpost = forpost.Forpost(target, login, password)
+    await fpost.initialize()
+    await fpost.edit_camera(
+        account_id=969,
+        id_camera=1598,
+        name="test_camera",
+        locations="Irkutsk",
+        ipaddress="168.192.10.10",
+        port_onvif=5542,
+        port_http=8082,
+        login="test_login",
+        password="test-pass",
+        stream="/media/video1",
+        videocodec="H.264",
+        OnvifMotionPort=False,
+        resolution="1280x720",
+        motion=True,
+        record=5,
+        mic=False,
+        speed=1536,
+        isactive=True
+    )
     await fpost.close()
 
 
@@ -193,7 +218,7 @@ async def backup_all_forpost():
 
 async def main():
 
-    await test_7()
+    await test_8()
 
 
 
