@@ -17,7 +17,7 @@ async def test_1():
     # Ищем аккаунт по номеру договора или названию
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    acc = await fpost.search_account('430984')
+    acc = await fpost.search_account('id430745')
     if isinstance(acc, account.Account):
         print(f"Аккаунт ID: {acc.id}\n" 
               f"Имя: {acc.name}\n" 
@@ -55,6 +55,7 @@ async def test_2():
 
 async def test_3():
     #выгребаем все аккаунты и записываем в файл
+    now = datetime.datetime.now()
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
     accounts = await fpost.get_all_accounts()
@@ -66,6 +67,8 @@ async def test_3():
     else:
         print("Аккаунтов нет.")
     await fpost.close()
+    end_time = datetime.datetime.now()
+    print(f"Время работы функции: {end_time - now}")
 
 
 async def test_4():
@@ -117,9 +120,9 @@ async def test_6():
     # создаем аккаунт, создаем в нем пользователя
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    account_id = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
-    print(f"account ID: {account_id}")
-    user_ui = await fpost.add_user(login="1234512345", password="1234512345", account_id=account_id)
+    #account_id = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
+    #print(f"account ID: {account_id}")
+    user_ui = await fpost.add_user(login="1234512345", password="1234512345", account_id=969)
     print(f'user ID: {user_ui}')
     await fpost.close()
 
@@ -151,21 +154,21 @@ async def test_8():
     await fpost.edit_camera(
         account_id=969,
         id_camera=1598,
-        name="test_camera",
-        locations="Irkutsk",
-        ipaddress="168.192.10.10",
-        port_onvif=5542,
-        port_http=8082,
-        login="test_login",
-        password="test-pass",
-        stream="/media/video1",
+        name="Татаров А id-1493",
+        locations="Бассеин",
+        ipaddress="100.72.0.22",
+        port_onvif=5543,
+        port_http=8083,
+        login="admin",
+        password="1kbt7lbc",
+        stream="/0",
         videocodec="H.264",
-        OnvifMotionPort=False,
-        resolution="1280x720",
+        OnvifMotionPort=True,
+        resolution="1280x1024",
         motion=True,
-        record=5,
-        mic=False,
-        speed=1536,
+        record=0,
+        mic=True,
+        speed=2048,
         isactive=True
     )
     await fpost.close()
@@ -214,11 +217,13 @@ async def backup_all_forpost():
 
     await fpost.close()
     await write_log(f'backup_all_forpost: закончили бекапить. записано {len(accounts)} аккаунтов')
+    end_time = datetime.datetime.now()
+    print(f"Время работы функции: {end_time-now}")
 
 
 async def main():
 
-    await test_8()
+    await test_1()
 
 
 

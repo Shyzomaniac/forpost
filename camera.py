@@ -1,6 +1,10 @@
 
 class Camera:
-    def __init__(self, id, name, status, locations, record, mic, ipaddress, port_onvif, port_http, speed, login, password, model, stream, videocodec):
+    def __init__(self, id, name: str = "", status: str = "", locations: str = "", record: int = 0, mic: bool = False,
+                 ipaddress: str = "",
+                 port_onvif: int = 554, port_http: int = 8080, speed: int = 2048, login: str = "admin",
+                 password: str = "paswr",
+                 model: str = "ХЗ", stream: str = "/media/video1", videocodec: str = "H.264"):
         self.id = id
         self.name = name
         self.status = status

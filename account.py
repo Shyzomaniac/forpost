@@ -1,19 +1,31 @@
 from camera import Camera
 from user import User
 
-
 class Account:
-    def __init__(self, id=0, name=0, contract=0, status=0, max_cameras=0, max_users=0, num_users=0, num_cameras=0):
+    def __init__(self, id=0, name='', contract='', status='',
+                 max_cameras=0, max_users=0):
         self.id = id
         self.name = name
         self.contract = contract
         self.status = status
-        self.max_cameras = max_cameras
-        self.max_users = max_users
-        self.num_users = num_users
-        self.num_cameras = num_cameras
+        self.max_cameras = self._to_int(max_cameras)
+        self.max_users = self._to_int(max_users)
         self.cameras = []
         self.users = []
+
+    @property
+    def num_cameras(self):
+        return len(self.cameras)
+
+    @property
+    def num_users(self):
+        return len(self.users)
+
+    def _to_int(self, value):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
 
     def add_camera(self, camera: Camera):
         self.cameras.append(camera)
@@ -28,6 +40,26 @@ class Account:
         self.users = [usr for usr in self.users if usr.id != user_id]
 
     def __str__(self):
-        return f'ID: {self.id}, Name: {self.name}, Договор: {self.contract}, Status: {self.status}' \
-               f'MAX Cameras: {self.max_cameras}, Cameras: {self.num_cameras}' \
-               f'MAX Users: {self.max_users}, Users: {self.num_users}'
+        return (f'ID: {self.id}, Name: {self.name}, Договор: {self.contract}, Status: {self.status}\n'
+                f'MAX Cameras: {self.max_cameras}, Cameras: {self.num_cameras}\n'
+                f'MAX Users: {self.max_users}, Users: {self.num_users}')
+
+    @property
+    def max_cameras(self):
+        return self._max_cameras
+
+    @max_cameras.setter
+    def max_cameras(self, value):
+        self._max_cameras = self._to_int(value)
+        if self._max_cameras < 0:
+            self._max_cameras = 0
+
+    @property
+    def max_users(self):
+        return self._max_users
+
+    @max_users.setter
+    def max_users(self, value):
+        self._max_users = self._to_int(value)
+        if self._max_users < 0:
+            self._max_users = 0

@@ -92,8 +92,6 @@ class Forpost:
                                 acc_info = await self.get_account(account.id)
                                 account.max_cameras = acc_info.get('max_cameras', None)
                                 account.max_users = acc_info.get('max_users', None)
-                                account.num_users = acc_info.get('num_users', None)
-                                account.num_cameras = acc_info.get('num_cameras', None)
                                 users_table = await self.get_users(account.id)
                                 if users_table:
                                     for user in users_table:
@@ -254,7 +252,6 @@ class Forpost:
                 await write_log("Не удалось получить страницу камер.")
                 return []
 
-
     async def get_camera(self, account_id, id_camera) -> dict:
         """
     Функция извлекает из форпоста все настройки камеры.
@@ -268,13 +265,13 @@ class Forpost:
             - name (str)
             - status (str)
             - location (str)
-            - record (str)
-            - mic (str)
+            - record (int)
+            - mic (bool)
             - model (str)
             - speed (str)
             - ipaddress (str)
-            - port_onvif (str)
-            - port_http (str)
+            - port_onvif (int)
+            - port_http (int)
             - login (str)
             - password (str)
             - stream (str)
@@ -285,13 +282,13 @@ class Forpost:
         name = "ХЗ"
         status = "ХЗ"
         locations = "ХЗ"
-        record = "ХЗ"
-        mic = "ХЗ"
+        record: int = 0
+        mic: bool = False
         model = "ХЗ"
-        speed = "ХЗ"
+        speed: int = 0
         ip_camera = 'ХЗ'
-        port_onvif = 'ХЗ'
-        port_http = 'ХЗ'
+        port_onvif: int = 0
+        port_http: int = 0
         login = 'ХЗ'
         password = 'ХЗ'
         stream = 'ХЗ'
@@ -323,8 +320,13 @@ class Forpost:
                         locations = td_text
                     elif th_text == "Запись":
                         record = td_text
+                        if record == "Не выполняется":
+                            record = 0
+                        else:
+                            record_str = td_text.split('(')[1].split(' ')[0]
+                            record = int(record_str)
                     elif th_text == "Использовать микрофон":
-                        mic = td_text
+                        mic = (td_text == "Вкл.")
                     elif th_text == "Модель камеры":
                         model = td_text
             else:
@@ -340,11 +342,11 @@ class Forpost:
                 if max_bandwidth_select:
                     selected_option = max_bandwidth_select.find('option', {'selected': 'selected'})
                     if selected_option:
-                        speed = selected_option.get('value')
+                        speed = int(selected_option.get('value'))
                     else:
-                        speed = "ХЗ"
+                        speed = 0
                 else:
-                    speed = "ХЗ"
+                    speed = 0
                 ip_camera_input = soup.find('input', {'id': 'Camera_IP'})
                 if ip_camera_input:
                     ip_camera = ip_camera_input.get('value', 'ХЗ')
@@ -352,14 +354,14 @@ class Forpost:
                     ip_camera = 'ХЗ'
                 port_onvif_input = soup.find('input', {'id': 'Camera_Port'})
                 if port_onvif_input:
-                    port_onvif = port_onvif_input.get('value', 'ХЗ')
+                    port_onvif = int(port_onvif_input.get('value', 'ХЗ'))
                 else:
-                    port_onvif = 'ХЗ'
+                    port_onvif = 0
                 port_http_input = soup.find('input', {'id': 'Camera_HTTPPort'})
                 if port_http_input:
-                    port_http = port_http_input.get('value', 'ХЗ')
+                    port_http = int(port_http_input.get('value', 'ХЗ'))
                 else:
-                    port_http = 'ХЗ'
+                    port_http = 0
                 camera_Login_input = soup.find('input', {'id': 'Camera_Login'})
                 if camera_Login_input:
                     login = camera_Login_input.get('value', 'ХЗ')
@@ -381,26 +383,26 @@ class Forpost:
                     if videocodec_select:
                         videocodec = videocodec_select.get('value', 'h.264')
                     else:
-                        videocodec  = 'h.264'
+                        videocodec = 'h.264'
                 else:
                     videocodec = 'h.264'
         await write_log("Возвращаем словарь с камерой")
         return {
-                'name': name,
-                'status': status,
-                'location': locations,
-                'record': record,
-                'mic': mic,
-                'model': model,
-                'speed': speed,
-                'ipaddress': ip_camera,
-                'port_onvif': port_onvif,
-                'port_http': port_http,
-                'login': login,
-                'password': password,
-                'stream': stream,
-                'videocodec': videocodec
-            }
+            'name': name,
+            'status': status,
+            'location': locations,
+            'record': record,
+            'mic': mic,
+            'model': model,
+            'speed': speed,
+            'ipaddress': ip_camera,
+            'port_onvif': port_onvif,
+            'port_http': port_http,
+            'login': login,
+            'password': password,
+            'stream': stream,
+            'videocodec': videocodec
+        }
 
 
 #------------- Парсим все аккаунты ---------------------------
@@ -870,7 +872,7 @@ class Forpost:
                 try:
                     account_id = int(account_id)
                 except ValueError:
-                    print("Ошибка: account_id должен быть целым числом")
+                    await write_log("Ошибка: account_id должен быть целым числом")
                     return None
 
             for port in [port_onvif, port_http]:
@@ -878,26 +880,26 @@ class Forpost:
                     try:
                         port = int(port)
                     except ValueError:
-                        print("Ошибка: порты должны быть целыми числами")
+                        await write_log("Ошибка: порты должны быть целыми числами")
                         return None
 
             valid_speeds = [128, 256, 512, 1024, 1536, 2048, 3072, 3584, 4096, 5120, 6144, 7168, 8192]
             if speed not in valid_speeds:
                 speed = min(valid_speeds, key=lambda x: abs(x - speed))
-                print(f"Предупреждение: скорость изменена на ближайшее допустимое значение: {speed}")
+                await write_log(f"Предупреждение: скорость изменена на ближайшее допустимое значение: {speed}")
 
             if videocodec.lower() not in ['h.264', 'h.265']:
-                print("Ошибка: недопустимый видеокодек. Допустимые значения: H.264 или H.265")
+                await write_log("Ошибка: недопустимый видеокодек. Допустимые значения: H.264 или H.265")
                 return None
             videocodec = videocodec.upper()
 
             valid_record_days = list(range(0, 31)) + [45, 60, 90]
             if record not in valid_record_days:
-                print("Ошибка: недопустимое значение записи. Допустимые значения: 0-30, 45, 60, 90 дней")
+                await write_log("Ошибка: недопустимое значение записи. Допустимые значения: 0-30, 45, 60, 90 дней")
                 return None
 
         except Exception as e:
-            print(f"Ошибка валидации параметров: {str(e)}")
+            await write_log(f"Ошибка валидации параметров: {str(e)}")
             return None
 
         url = f"{self.target}/admin/account/{account_id}/camera/wizard.html"
@@ -938,17 +940,17 @@ class Forpost:
                 try:
                     response_data = json.loads(response_text)
                     if 'id' in response_data:
-                        print(f"Успешно получен ID камеры: {response_data['id']}")
                         await write_log(f"add_camera: Успешно получен ID камеры: {response_data['id']}")
                         return int(response_data['id'])
                     elif 'Camera_MJPEG' in response_data:
-                        print(f"Ошибка валидации: {response_data['Camera_MJPEG']}")
+                        await write_log(f"add_camera: Ошибка валидации: {response_data['Camera_MJPEG']}")
                         raise Exception("ID камеры не найден в JSON-ответе")
                     else:
+                        await write_log("add_camera: ID камеры не найден в JSON-ответе")
                         raise Exception("ID камеры не найден в JSON-ответе")
                 except json.JSONDecodeError:
                     soup = BeautifulSoup(response_text, 'html.parser')
-                    print("Ответ не в формате JSON, пытаемся парсить HTML")
+                    await write_log("add_camera: Ответ не в формате JSON, пытаемся парсить HTML")
                     camera_id = None
                     for input_tag in soup.find_all('input', type='hidden'):
                         if 'name' in input_tag.attrs and 'id' in input_tag.attrs['name']:
@@ -956,12 +958,14 @@ class Forpost:
                             break
 
                     if camera_id:
+                        await write_log(f"add_camera: Возвращаем ID камеры: {camera_id}")
                         return int(camera_id)
                     else:
+                        await write_log(f"add_camera: Не удалось найти ID камеры в HTML-ответе")
                         raise Exception("Не удалось найти ID камеры в HTML-ответе")
 
         except Exception as e:
-            print(f"Произошла ошибка: {str(e)}")
+            await write_log(f"add_camera: Произошла ошибка: {str(e)}")
             return None
 
 
