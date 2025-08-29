@@ -13,3 +13,15 @@ class User:
 
     def __str__(self):
         return f'ID: {self.id}, Status: {self.status}, Login: {self.login}, pass: {self.password}'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'login': self.login,
+            'password': self.password,
+            'status': self.status
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)

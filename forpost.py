@@ -804,7 +804,7 @@ class Forpost:
         :param account_id: ID аккаунта
         :param user_id: ID пользователя
         :param password: новый пароль
-        :return: True\False
+        :return: True/False
         """
         await write_log(f"change_user_password: меняем пароль на пользователе: {user_id} в аккаунте ID: {account_id}")
         url = f"{self.target}/admin/account/{account_id}/user/{user_id}/password.html"
@@ -992,7 +992,7 @@ class Forpost:
                 "1024x768", "1280x720", "1280x1024", "1600x1200",
                 "1920x1080", "2048x1536", "2304x1296", "2560x1440",
                 "2592x1520", "2688x1520"
-        :param motion: Получать уведомления о движении от камеры True\False
+        :param motion: Получать уведомления о движении от камеры True/False
         :param record: Запись архива. Допустимые значения: 0-30, 45, 60, 90 дней. 0 - без хранения.
         :param mic: Используем микрофон - False или True
         :param speed: Битрейт. допустимые значения:

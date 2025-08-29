@@ -36,3 +36,27 @@ class Camera:
                f'Запись: {self.record}, MIC: {self.mic}' \
                f'IP: {self.ipaddress}, Port Onvif: {self.port_onvif}, Port http: {self.port_http}' \
                f'SPEED: {self.speed}, login: {self.login}, pass: {self.password}'
+
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'status': self.status,
+            'locations': self.locations,
+            'record': self.record,
+            'ipaddress': self.ipaddress,
+            'port_http': self.port_http,
+            'port_onvif': self.port_onvif,
+            'speed': self.speed,
+            'login': self.login,
+            'password': self.password,
+            'model': self.model,
+            'stream': self.stream,
+            'videocodec': self.videocodec,
+            'mic': self.mic
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(**data)

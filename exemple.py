@@ -1,6 +1,7 @@
 import forpost
 import asyncio
 import datetime
+from time import perf_counter
 import os
 import json
 import account
@@ -148,6 +149,7 @@ async def test_7():
 
     await fpost.close()
 
+
 async def test_8():
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
@@ -175,7 +177,7 @@ async def test_8():
 
 
 async def backup_all_forpost():
-    #выгребаем аккаунты, по аккаунтам выгребаем все что в них есть и пишем все это в файл
+    #выгребаем аккаунты, по аккаунтам выгребаем все что в них есть и пишем все это в файл + создаем json файл
     await write_log(f'backup_all_forpost: начинаем бекапить форпост полностью')
     now = datetime.datetime.now()
     date = now.strftime('%Y_%m_%d')
@@ -185,8 +187,10 @@ async def backup_all_forpost():
     accounts = await fpost.get_all_accounts()
     print(f'Аккаунтов извлечено: {len(accounts)}')
     big_backup += f'{date}. Аккаунтов извлечено: {len(accounts)}\n\n'
+    json_data = []
     for account_id, data in accounts.items():
         account: Account = await fpost.search_account(data.get("contract"))
+        json_data.append(account.to_dict())
         big_backup += f"Аккаунт ID: {account.id}\n" \
                       f"Имя: {account.name}\n" \
                       f"Договор: {account.contract}\n" \
@@ -210,6 +214,12 @@ async def backup_all_forpost():
         big_backup += f"===========================================================================\n\n"
 
     os.makedirs('backup', exist_ok=True)
+    json_filename = f'backup_{date}.json'
+    json_file_path = os.path.join('backup', json_filename)
+    with open(json_file_path, 'w', encoding='utf-8') as f:
+        json.dump(json_data, f, indent=4, ensure_ascii=False)
+
+    os.makedirs('backup', exist_ok=True)
     log_filename = f'backup_{date}.txt'
     file_path = os.path.join('backup', log_filename)
     with open(file_path, "w", encoding="utf-8") as f:
@@ -218,12 +228,27 @@ async def backup_all_forpost():
     await fpost.close()
     await write_log(f'backup_all_forpost: закончили бекапить. записано {len(accounts)} аккаунтов')
     end_time = datetime.datetime.now()
-    print(f"Время работы функции: {end_time-now}")
+    print(f"Время работы функции: {end_time - now}")
+
+
+def load_accounts_from_json(file_path):
+     #Читаем все аккаунты из json файла
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    return [Account.from_dict(item) for item in data]
+
 
 
 async def main():
 
-    await test_1()
+    await backup_all_forpost()
+
+    '''
+    accounts = load_accounts_from_json('backup/backup_2025_08_28.json')
+    for account in accounts:
+        print(f"Договор: {account.contract}, Камер: {len(account.cameras)}")
+
+    '''
 
 
 

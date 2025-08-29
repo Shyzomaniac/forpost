@@ -63,3 +63,29 @@ class Account:
         self._max_users = self._to_int(value)
         if self._max_users < 0:
             self._max_users = 0
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'contract': self.contract,
+            'status': self.status,
+            'max_cameras': self.max_cameras,
+            'max_users': self.max_users,
+            'cameras': [camera.to_dict() for camera in self.cameras],
+            'users': [user.to_dict() for user in self.users]
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        account = cls(
+            id=data.get('id'),
+            name=data.get('name'),
+            contract=data.get('contract'),
+            status=data.get('status'),
+            max_cameras=data.get('max_cameras'),
+            max_users=data.get('max_users')
+        )
+        account.cameras = [Camera.from_dict(camera) for camera in data.get('cameras', [])]
+        account.users = [User.from_dict(user) for user in data.get('users', [])]
+        return account
