@@ -18,7 +18,7 @@ async def test_1():
     # Ищем аккаунт по номеру договора или названию
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    acc = await fpost.search_account('id430745')
+    acc = await fpost.search_account('554455')
     if isinstance(acc, account.Account):
         print(f"Аккаунт ID: {acc.id}\n" 
               f"Имя: {acc.name}\n" 
@@ -121,7 +121,7 @@ async def test_6():
     # создаем аккаунт, создаем в нем пользователя
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
-    #account_id = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
+    #account_id = await fpost.create_account(name="Vasia Pupkin", contract="556677", max_cameras="2")
     #print(f"account ID: {account_id}")
     user_ui = await fpost.add_user(login="1234512345", password="1234512345", account_id=969)
     print(f'user ID: {user_ui}')
