@@ -177,7 +177,7 @@ async def test_8():
 
 
 async def backup_all_forpost():
-    #выгребаем аккаунты, по аккаунтам выгребаем все что в них есть и пишем все это в файл + создаем json файл
+    #выгребаем аккаунты, по аккаунтам выгребаем все что в них есть и пишем все это в файл + создаем json файл:
     await write_log(f'backup_all_forpost: начинаем бекапить форпост полностью')
     now = datetime.datetime.now()
     date = now.strftime('%Y_%m_%d')
