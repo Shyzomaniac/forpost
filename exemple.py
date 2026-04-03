@@ -49,7 +49,7 @@ async def test_2():
     fpost = forpost.Forpost(target, login, password)
     await fpost.initialize()
     account_id = await fpost.create_account(name="Власов Виктор Сергеевич", contract="556677", max_cameras="2")
-    #await forpost.edit_account(account_id=account_id, name="Vlasov Viktor Sergeevich", contract="889900", max_cameras="1", max_users="1")
+    #await forpost.edit_account(account_id=account_id, name="Vasia Pupkin", contract="889900", max_cameras="1", max_users="1")
     print(account_id)
     await fpost.close()
 
